@@ -1,57 +1,43 @@
 # helio-pasta-nafig 🌵
 
-Telegram-бот с набором утилит, написанный на **Java 17 + Lombok**.
+Telegram-бот с набором утилит на **Java 17 + Lombok** с чистой ООП-архитектурой команд.
 
-## Стек
-- [TelegramBots](https://github.com/rubenlagus/TelegramBots) 6.9.7.1 (long polling)
-- Lombok
-- Gson
-- ZXing (генерация QR)
-- libphonenumber (`/phone`)
+## Архитектура
+
+```
+com.helio.bot
+├── Main                 — точка входа
+├── HelioBot             — транспортный слой (long polling), делегирует в реестр
+├── core
+│   ├── Command          — контракт команды (name/description/category/aliases/execute)
+│   ├── Category         — группы команд для /help
+│   ├── CommandContext   — доступ к сообщению/аргументам + reply-хелперы
+│   ├── CommandRegistry  — реестр, резолв по имени/алиасам, группировка
+│   └── BotBootstrap     — композиционный корень (ручной DI)
+├── commands
+│   ├── info | text | ip | net | media | minecraft   — по классу на команду
+├── minecraft            — доменный слой (пинг, репозитории, сбор статистики)
+├── render               — QuoteRenderer, GraphRenderer
+├── text                 — TextTransforms (чистые преобразования)
+└── util                 — HttpService, Whois
+```
+
+Каждая команда — отдельный класс, реализующий `Command`; зависимости (HTTP, репозитории,
+сервисы) внедряются через конструктор (Lombok `@RequiredArgsConstructor`). Добавить команду =
+создать класс и зарегистрировать его в `BotBootstrap`.
 
 ## Сборка и запуск
 
 ```bash
 mvn clean package
-BOT_TOKEN=<токен_от_BotFather> BOT_USERNAME=<имя_бота> java -jar target/helio-bot.jar
+BOT_TOKEN=<токен_от_BotFather> BOT_USERNAME=<имя> java -jar target/helio-bot.jar
 ```
 
-Переменные окружения:
-- `BOT_TOKEN` (обязательно) — токен бота от @BotFather
-- `BOT_USERNAME` (опционально) — username бота
-- `LAUNCHER_AD_URL` (опционально) — URL JSON-списка серверов для `/launcherad`
+Переменные окружения: `BOT_TOKEN` (обязательно), `BOT_USERNAME`, `LAUNCHER_AD_URL` (для `/launcherad`).
 
-## Команды (все реализованы)
+## Команды
 
-| Команда | Описание |
-|---|---|
-| /help, /bot, /aliases | Справка / информация |
-| /base64 | base64 кодирование/декодирование (`-d` для декода) |
-| /hash | MD5 / SHA-1 / SHA-256 |
-| /genstr | Генерация случайной строки (`/genstr <длина> [hex]`) |
-| /reverse /rotate /rune /smallcaps /superscript /translit | Текстовые трансформации |
-| /id | ID пользователя / чата / реплая / форварда |
-| /dec2ip /ipconvert | Конвертация IP (dec↔IPv4, hex/oct/bin) |
-| /ipinfo | Информация по IP (ip-api.com) |
-| /currency | Курс валют к рублю (ЦБ РФ) |
-| /weather | Погода (open-meteo) |
-| /port | Проверка TCP-порта |
-| /whois | WHOIS домена/IP (IANA → referral) |
-| /qrcode | Генерация QR-кода |
-| /quote | Картинка-цитата |
-| /phone | Информация о номере (libphonenumber): страна, тип, валидность |
-| /mcping | Пинг Minecraft-сервера — Java Edition + автофолбэк на Bedrock |
-| /mcaddserver /mcmyservers /mcremoveserver /mcserveralias | Управление списком серверов |
-| /mcstats | min / avg / max / рекорд онлайна за окно |
-| /mcgraph | График онлайна (PNG), `/mcgraph <сервер> [часов]` задаёт окно |
-| /mccompare | Сравнение онлайна нескольких серверов (график + сводка) |
-| /mojangblacklist | Проверка сервера в ЧС Mojang (blockedservers, SHA-1 + wildcard) |
-| /launcherad | Список рекламируемых серверов TL/LL (источник в `LAUNCHER_AD_URL`) |
-
-## Сбор статистики Minecraft
-
-При старте бота запускается фоновый сборщик (`StatsCollector`), который раз в 5 минут
-пингует все добавленные серверы (`/mcaddserver`) и пишет замеры онлайна в
-`~/.helio-bot-stats.json`. На основе этих замеров работают `/mcstats`, `/mcgraph`, `/mccompare`.
-История начинает накапливаться сразу после добавления сервера — первые графики появятся
-через несколько интервалов сбора.
+Все ~35 команд реализованы и сгруппированы в `/help` по категориям: информация, текст, IP,
+сеть, медиа, Minecraft. Статистика Minecraft (`/mcstats`, `/mcgraph`, `/mccompare`) работает
+на встроенном сборщике (`StatsCollector`), который раз в 5 минут пингует добавленные
+(`/mcaddserver`) серверы и копит замеры онлайна в `~/.helio-bot-stats.json`.

@@ -3,4 +3,4 @@ target/
 *.iml
 .idea/
 .vscode/
-.helio-bot-servers.json
+.helio-bot-*.json

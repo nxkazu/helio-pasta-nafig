@@ -1,8 +1,7 @@
 package com.helio.bot;
 
-import com.helio.bot.command.CommandDef;
-import com.helio.bot.command.Commands;
-import com.helio.bot.command.Ctx;
+import com.helio.bot.core.CommandContext;
+import com.helio.bot.core.CommandRegistry;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
@@ -13,19 +12,19 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
 import java.io.ByteArrayInputStream;
-import java.util.Map;
 
+/** Тонкий транспортный слой: принимает апдейты, парсит команду и делегирует в CommandRegistry. */
 @Slf4j
 public class HelioBot extends TelegramLongPollingBot {
 
     private final String username;
     @Getter
-    private final Map<String, CommandDef> commands;
+    private final CommandRegistry registry;
 
-    public HelioBot(String token, String username) {
+    public HelioBot(String token, String username, CommandRegistry registry) {
         super(token);
         this.username = username;
-        this.commands = Commands.all();
+        this.registry = registry;
     }
 
     @Override
@@ -43,38 +42,33 @@ public class HelioBot extends TelegramLongPollingBot {
         if (!text.startsWith("/")) {
             return;
         }
-
-        String withoutSlash = text.substring(1);
-        String[] parts = withoutSlash.split("\\s+", 2);
-        String cmdRaw = parts[0];
-        int at = cmdRaw.indexOf('@');
+        String[] parts = text.substring(1).split("\\s+", 2);
+        String token = parts[0];
+        int at = token.indexOf('@');
         if (at >= 0) {
-            cmdRaw = cmdRaw.substring(0, at);
+            token = token.substring(0, at);
         }
-        String cmd = cmdRaw.toLowerCase();
-        String argLine = parts.length > 1 ? parts[1] : "";
-
-        Ctx ctx = new Ctx(this, update, message, argLine);
-        CommandDef def = commands.get(cmd);
-        if (def == null) {
-            ctx.reply("Неизвестная команда. /help — список команд.");
-            return;
-        }
-        try {
-            def.handler().run(ctx);
-        } catch (Exception e) {
-            log.error("Команда /{} завершилась ошибкой", cmd, e);
-            ctx.reply("Ошибка при выполнении команды: " + e.getMessage());
-        }
+        String args = parts.length > 1 ? parts[1] : "";
+        CommandContext ctx = new CommandContext(this, update, message, args);
+        registry.resolve(token).ifPresentOrElse(cmd -> {
+            try {
+                cmd.execute(ctx);
+            } catch (Exception e) {
+                log.error("Команда /{} завершилась ошибкой", cmd.name(), e);
+                ctx.reply("Ошибка при выполнении команды: " + e.getMessage());
+            }
+        }, () -> ctx.reply("Неизвестная команда. /help — список команд."));
     }
 
-    public void send(String chatId, String textToSend) {
+    public void send(String chatId, String text) {
+        if (text == null) {
+            text = "";
+        }
+        if (text.length() > 4096) {
+            text = text.substring(0, 4090) + "…";
+        }
         try {
-            execute(SendMessage.builder()
-                    .chatId(chatId)
-                    .text(textToSend)
-                    .disableWebPagePreview(true)
-                    .build());
+            execute(SendMessage.builder().chatId(chatId).text(text).disableWebPagePreview(true).build());
         } catch (Exception e) {
             log.error("Не удалось отправить сообщение", e);
         }

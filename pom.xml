@@ -6,10 +6,10 @@
 
     <groupId>com.helio</groupId>
     <artifactId>helio-pasta-nafig</artifactId>
-    <version>1.0.0</version>
+    <version>2.0.0</version>
     <packaging>jar</packaging>
     <name>helio-pasta-nafig</name>
-    <description>Telegram utility bot (Java + Lombok)</description>
+    <description>Telegram utility bot (Java 17 + Lombok, OOP command architecture)</description>
 
     <properties>
         <maven.compiler.release>17</maven.compiler.release>
@@ -79,9 +79,7 @@
                 <executions>
                     <execution>
                         <phase>package</phase>
-                        <goals>
-                            <goal>shade</goal>
-                        </goals>
+                        <goals><goal>shade</goal></goals>
                         <configuration>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
