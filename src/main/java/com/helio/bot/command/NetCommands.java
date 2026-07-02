@@ -2,6 +2,8 @@ package com.helio.bot.command;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.i18n.phonenumbers.PhoneNumberUtil;
+import com.google.i18n.phonenumbers.Phonenumber;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
@@ -16,43 +18,11 @@ import java.net.Socket;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 
 public final class NetCommands {
     private NetCommands() {
-    }
-
-    private static final LinkedHashMap<String, String> PHONE = new LinkedHashMap<>();
-
-    static {
-        // longest prefixes first
-        PHONE.put("380", "Украина");
-        PHONE.put("375", "Беларусь");
-        PHONE.put("998", "Узбекистан");
-        PHONE.put("996", "Киргизия");
-        PHONE.put("995", "Грузия");
-        PHONE.put("994", "Азербайджан");
-        PHONE.put("993", "Туркменистан");
-        PHONE.put("992", "Таджикистан");
-        PHONE.put("374", "Армения");
-        PHONE.put("373", "Молдова");
-        PHONE.put("372", "Эстония");
-        PHONE.put("371", "Латвия");
-        PHONE.put("370", "Литва");
-        PHONE.put("90", "Турция");
-        PHONE.put("86", "Китай");
-        PHONE.put("82", "Южная Корея");
-        PHONE.put("81", "Япония");
-        PHONE.put("49", "Германия");
-        PHONE.put("48", "Польша");
-        PHONE.put("44", "Великобритания");
-        PHONE.put("39", "Италия");
-        PHONE.put("34", "Испания");
-        PHONE.put("33", "Франция");
-        PHONE.put("91", "Индия");
-        PHONE.put("7", "Россия / Казахстан");
-        PHONE.put("1", "США / Канада");
     }
 
     private static String get(JsonObject o, String k) {
@@ -235,23 +205,42 @@ public final class NetCommands {
     static void phone(Ctx ctx) {
         String p = ctx.getArgLine().trim();
         if (p.isBlank()) {
-            ctx.reply("Использование: /phone <номер>");
+            ctx.reply("Использование: /phone <номер, напр. +79161234567>");
             return;
         }
-        String digits = p.replaceAll("[^0-9]", "");
-        if (digits.isEmpty()) {
-            ctx.reply("Не найдено цифр в номере.");
-            return;
+        try {
+            PhoneNumberUtil util = PhoneNumberUtil.getInstance();
+            String digits = p.replaceAll("[^0-9]", "");
+            String raw = p.startsWith("+") ? p : ("+" + digits);
+            Phonenumber.PhoneNumber num = util.parse(raw, null);
+            boolean valid = util.isValidNumber(num);
+            boolean possible = util.isPossibleNumber(num);
+            String region = util.getRegionCodeForNumber(num);
+            String country = (region != null && !region.isEmpty())
+                    ? new Locale("", region).getDisplayCountry(new Locale("ru")) : "неизвестно";
+            PhoneNumberUtil.PhoneNumberType type = util.getNumberType(num);
+            String typeStr = switch (type) {
+                case MOBILE -> "мобильный";
+                case FIXED_LINE -> "стационарный";
+                case FIXED_LINE_OR_MOBILE -> "стационарный/мобильный";
+                case TOLL_FREE -> "бесплатный (8-800)";
+                case PREMIUM_RATE -> "премиум";
+                case VOIP -> "VoIP";
+                case SHARED_COST -> "с распределённой оплатой";
+                case PERSONAL_NUMBER -> "персональный";
+                case PAGER -> "пейджер";
+                case UAN -> "UAN";
+                case VOICEMAIL -> "голосовая почта";
+                default -> "неизвестно";
+            };
+            ctx.reply("📞 Номер: " + util.format(num, PhoneNumberUtil.PhoneNumberFormat.INTERNATIONAL) + "\n"
+                    + "E.164: " + util.format(num, PhoneNumberUtil.PhoneNumberFormat.E164) + "\n"
+                    + "Страна: " + country + (region != null ? " (" + region + ")" : "") + "\n"
+                    + "Тип: " + typeStr + "\n"
+                    + "Код страны: +" + num.getCountryCode() + "\n"
+                    + "Валидный: " + (valid ? "да" : (possible ? "возможен, но не подтверждён" : "нет")));
+        } catch (Exception e) {
+            ctx.reply("Не удалось разобрать номер. Укажи в международном формате, напр. +79161234567. (" + e.getMessage() + ")");
         }
-        String country = "неизвестно";
-        for (Map.Entry<String, String> e : PHONE.entrySet()) {
-            if (digits.startsWith(e.getKey())) {
-                country = e.getValue();
-                break;
-            }
-        }
-        ctx.reply("📞 Номер: +" + digits + "\n"
-                + "Страна (по коду): " + country + "\n\n"
-                + "(Полная валидация/тип номера — TODO: подключить libphonenumber.)");
     }
 }

@@ -1,5 +1,6 @@
 package com.helio.bot;
 
+import com.helio.bot.command.StatsCollector;
 import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
@@ -15,6 +16,8 @@ public class Main {
         }
         TelegramBotsApi api = new TelegramBotsApi(DefaultBotSession.class);
         api.registerBot(new HelioBot(token, username));
+        // Запускаем фоновый сбор статистики Minecraft-серверов (для /mcstats, /mcgraph, /mccompare)
+        StatsCollector.start();
         log.info("HelioBot запущен как @{}", username);
     }
 }

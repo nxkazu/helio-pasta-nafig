@@ -11,8 +11,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public final class ServerStore {
     private ServerStore() {
@@ -96,5 +98,26 @@ public final class ServerStore {
             }
         }
         return false;
+    }
+
+    /** Все уникальные хосты всех пользователей (для фонового сбора статистики). */
+    public static synchronized List<String> allHosts() {
+        Set<String> hosts = new LinkedHashSet<>();
+        for (List<Server> l : load().values()) {
+            for (Server s : l) {
+                hosts.add(s.host);
+            }
+        }
+        return new ArrayList<>(hosts);
+    }
+
+    /** Преобразует хост или алиас пользователя в реальный хост. */
+    public static synchronized String resolve(String userId, String token) {
+        for (Server s : list(userId)) {
+            if (s.host.equalsIgnoreCase(token) || (s.alias != null && s.alias.equalsIgnoreCase(token))) {
+                return s.host;
+            }
+        }
+        return token;
     }
 }
